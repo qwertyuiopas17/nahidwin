@@ -118,8 +118,12 @@ for path in [instance_path, models_path, logs_path]:
 
 # Database configuration
 app.config.update({
-    'SQLALCHEMY_DATABASE_URI': f'sqlite:///{os.path.join(instance_path, "enhanced_chatbot.db")}',
-    'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+    # Replace it with this block:
+# Use the DATABASE_URL from Render's environment, but fall back to SQLite for local development
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url and database_url.startswith('postgres://'):
+        database_url = database_url.replace('postgres://', 'postgresql://', 1)
+    app.config['SQLALCHEMY_DATABASE_URI'] = database_url or f'sqlite:///{os.path.join(instance_path, "enhanced_chatbot.db")}'
     'SQLALCHEMY_ENGINE_OPTIONS': {
         'pool_timeout': 30,
         'pool_recycle': 300,
