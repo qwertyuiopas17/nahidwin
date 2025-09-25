@@ -134,10 +134,10 @@ app.config.update({
     'SQLALCHEMY_DATABASE_URI': db_uri,
     'SQLALCHEMY_TRACK_MODIFICATIONS': False,
     'SQLALCHEMY_ENGINE_OPTIONS': {
-        'pool_timeout': 30,
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-        'echo': False
+    'pool_timeout': 30,
+    'pool_recycle': 300,
+    'pool_pre_ping': True,
+    'echo': False
     }
 })
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
