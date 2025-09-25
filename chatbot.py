@@ -113,24 +113,33 @@ models_path = os.path.join(basedir, 'models')
 logs_path = os.path.join(basedir, 'logs')
 
 # Ensure all directories exist
+# In chatbot.py
+
 for path in [instance_path, models_path, logs_path]:
     os.makedirs(path, exist_ok=True)
 
-# Database configuration
-app.config.update({
-    # Replace it with this block:
-# Use the DATABASE_URL from Render's environment, but fall back to SQLite for local development
-    # In chatbot.py, find the database configuration section
+# --- THIS IS THE CORRECTED CODE BLOCK ---
 
-# Replace the entire block with this corrected version:
+# First, determine the correct database URI
 database_url = os.environ.get('DATABASE_URL')
 if database_url and database_url.startswith('postgres://'):
-    # This code runs on Render
-    app.config['SQLALCHEMY_DATABASE_URI'] = database_url.replace('postgres://', 'postgresql://', 1)
+    # This path is for Render (PostgreSQL)
+    db_uri = database_url.replace('postgres://', 'postgresql://', 1)
 else:
-    # This code runs on your local computer
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(instance_path, "enhanced_chatbot.db")}'
+    # This path is for your local computer (SQLite)
+    db_uri = f'sqlite:///{os.path.join(instance_path, "enhanced_chatbot.db")}'
 
+# Now, update the app configuration
+app.config.update({
+    'SQLALCHEMY_DATABASE_URI': db_uri,
+    'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+    'SQLALCHEMY_ENGINE_OPTIONS': {
+        'pool_timeout': 30,
+        'pool_recycle': 300,
+        'pool_pre_ping': True,
+        'echo': False
+    }
+})
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         'pool_timeout': 30,
         'pool_recycle': 300,
