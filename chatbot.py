@@ -136,7 +136,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
         'pool_recycle': 300,
         'pool_pre_ping': True,
         'echo': False
-    }
+    
 })
 
 # Initialize database
