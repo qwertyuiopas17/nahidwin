@@ -589,7 +589,8 @@ class ProgressiveResponseGenerator:
                     user_message=user_message, user_intent=intent, conversation_stage=updated_stage,
                     severity_score=severity, context_history=context_history,
                     emotional_state=emotional_state.get('primary_emotion', 'neutral'),
-                    urgency_level=urgency_level, language=language # <-- ADD THIS
+                    urgency_level=urgency_level, 
+                    language=language # <-- ADD THIS
                 )
                     if llama_response:
                         self.logger.info(f"✅ Generated Llama 3 response for {user_id}")
