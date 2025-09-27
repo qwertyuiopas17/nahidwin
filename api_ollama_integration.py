@@ -200,7 +200,7 @@ class ApiClient:
 
 class GroqScoutClient:
     """Client for Groq's Llama 4 Scout (used for emoji/image interpretation)."""
-    def __init__(self, api_key: str = None, base_url: str = "https://api.groq.com/openai/v1", model: str = "meta-llama/llama-guard-4-12b"):
+    def __init__(self, api_key: str = None, base_url: str = "https://api.groq.com/openai/v1", model: str = "meta-llama/llama-4-scout-17b-16e-instruct"):
         # Separate API key to allow different security policy if desired
         self.api_key = api_key or os.getenv('GROQ_SCOUT_API_KEY') or os.getenv('GROQ_API_KEY') or os.getenv('API_KEY')
         self.base_url = base_url
