@@ -1704,6 +1704,94 @@ def test_ollama():
             "error": str(e)
         }), 500
 
+@app.route('/v1/user/<user_id>/profile', methods=['GET'])
+def get_user_profile(user_id):
+    """Get user profile and health app statistics"""
+    try:
+        user_summary = conversation_memory.get_user_summary(user_id)
+        if not user_summary:
+            return jsonify({
+                "error": "User not found",
+                "status": "error"
+            }), 404
+        
+        return jsonify({
+            "profile": user_summary,
+            "status": "success"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting user profile: {e}")
+        return jsonify({
+            "error": "Failed to retrieve user profile",
+            "status": "error"
+        }), 500
+
+@app.route('/v1/user/<user_id>/preferences', methods=['POST'])
+def update_user_preferences(user_id):
+    """Update user preferences"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "error": "No preferences data provided",
+                "status": "error"
+            }), 400
+        
+        # Update preferences in conversation memory
+        conversation_memory.update_user_preferences(user_id, data)
+        
+        return jsonify({
+            "message": "Preferences updated successfully",
+            "status": "success"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error updating user preferences: {e}")
+        return jsonify({
+            "error": "Failed to update preferences",
+            "status": "error"
+        }), 500
+
+@app.route('/v1/stats', methods=['GET'])
+def get_system_stats():
+    """Get Sehat Sahara system statistics"""
+    try:
+        # Get conversation memory stats
+        memory_stats = conversation_memory.get_system_stats()
+        
+        # Get database stats
+        db_stats = {
+            "total_users": User.query.count(),
+            "active_users": User.query.filter_by(is_active=True).count(),
+            "total_conversations": ConversationTurn.query.count(),
+            "conversations_today": ConversationTurn.query.filter(
+                ConversationTurn.timestamp >= datetime.now().date()
+            ).count(),
+            "emergency_calls_today": ConversationTurn.query.filter(
+                ConversationTurn.urgency_level == 'emergency',
+                ConversationTurn.timestamp >= datetime.now().date()
+            ).count()
+        }
+        
+        return jsonify({
+            "system_stats": {
+                "memory": memory_stats,
+                "database": db_stats,
+                "api_status": "available" if ollama_llama3.is_available else "unavailable",
+                "service_name": "Enhanced Mental Health Chatbot with Ollama Llama 3",
+                "version": "2.1.0"
+            },
+            "status": "success"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting system stats: {e}")
+        return jsonify({
+            "error": "Failed to retrieve system statistics",
+            "status": "error"
+        }), 500
+
 # Scheduled tasks and cleanup
 def cleanup_on_exit():
     """Cleanup tasks on application shutdown"""
