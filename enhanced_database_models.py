@@ -1,6 +1,6 @@
 """
-Enhanced Database Models - Complete database schema for mental health chatbot
-Includes user management, conversation tracking, method effectiveness, and counselor integration
+Sehat Sahara Health Assistant Database Models
+Database schema for health app features: appointments, doctors, health records, pharmacies
 """
 
 from flask_sqlalchemy import SQLAlchemy
@@ -12,56 +12,46 @@ import uuid
 db = SQLAlchemy()
 
 class User(db.Model):
-    """Enhanced user model with comprehensive tracking"""
+    """User model for Sehat Sahara patients"""
     __tablename__ = 'users'
     
     id = db.Column(db.Integer, primary_key=True)
-    student_id = db.Column(db.String(15), unique=True, nullable=False, index=True)
+    patient_id = db.Column(db.String(15), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    phone_number = db.Column(db.String(15), nullable=True)
     full_name = db.Column(db.String(100), nullable=True)
     password_hash = db.Column(db.String(256), nullable=False)
-    college = db.Column(db.String(100), nullable=True)
+    
+    # Location information for rural patients
+    village = db.Column(db.String(100), nullable=True)
+    district = db.Column(db.String(100), nullable=True)
+    state = db.Column(db.String(100), default='Punjab')
+    pincode = db.Column(db.String(10), nullable=True)
     
     # Account management
     created_at = db.Column(db.DateTime, default=datetime.now)
     last_login = db.Column(db.DateTime)
     is_active = db.Column(db.Boolean, default=True)
     email_verified = db.Column(db.Boolean, default=False)
+    phone_verified = db.Column(db.Boolean, default=False)
     
-    # Mental health tracking
+    # App usage tracking
     total_conversations = db.Column(db.Integer, default=0)
-    current_risk_level = db.Column(db.String(20), default='low')  # low, medium, high, crisis
-    current_conversation_stage = db.Column(db.String(50), default='initial_contact')
-    primary_concerns = db.Column(db.Text)  # JSON array of main mental health concerns
+    preferred_language = db.Column(db.String(10), default='hi')  # hi, pa, en
+    app_version = db.Column(db.String(20), nullable=True)
     
-    # Method and intervention tracking
-    methods_tried_count = db.Column(db.Integer, default=0)
-    effective_methods_count = db.Column(db.Integer, default=0)
-    current_method = db.Column(db.String(100))
-    method_check_due = db.Column(db.DateTime)
-    
-    # Professional help tracking
-    counselor_referral_status = db.Column(db.String(50), default='none')  # none, suggested, interested, booked, completed
-    referral_date = db.Column(db.DateTime)
-    last_crisis_date = db.Column(db.DateTime)
-    crisis_count = db.Column(db.Integer, default=0)
-    
-    # Progress tracking
-    first_severity_score = db.Column(db.Float)
-    latest_severity_score = db.Column(db.Float)
-    average_severity_score = db.Column(db.Float)
-    improvement_trend = db.Column(db.String(20), default='stable')  # improving, stable, declining
+    # Emergency contact
+    emergency_contact_name = db.Column(db.String(100), nullable=True)
+    emergency_contact_phone = db.Column(db.String(15), nullable=True)
     
     # Enhanced fields
-    timezone = db.Column(db.String(50), default='UTC')
-    preferred_language = db.Column(db.String(10), default='en')
+    timezone = db.Column(db.String(50), default='Asia/Kolkata')
     notification_preferences = db.Column(db.Text)  # JSON object for notification settings
     
     # Relationships
     conversation_turns = db.relationship('ConversationTurn', backref='user', lazy=True, cascade='all, delete-orphan')
-    method_feedback = db.relationship('MethodFeedback', backref='user', lazy=True, cascade='all, delete-orphan')
-    counselor_interactions = db.relationship('CounselorInteraction', backref='user', lazy=True, cascade='all, delete-orphan')
-    crisis_events = db.relationship('CrisisEvent', backref='user', lazy=True, cascade='all, delete-orphan')
+    appointments = db.relationship('Appointment', backref='user', lazy=True, cascade='all, delete-orphan')
+    health_records = db.relationship('HealthRecord', backref='user', lazy=True, cascade='all, delete-orphan')
     user_sessions = db.relationship('UserSession', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def set_password(self, password):
@@ -71,19 +61,6 @@ class User(db.Model):
     def check_password(self, password):
         """Check password against hash"""
         return check_password_hash(self.password_hash, password)
-    
-    def get_primary_concerns(self):
-        """Get primary concerns as list"""
-        if self.primary_concerns:
-            try:
-                return json.loads(self.primary_concerns)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_primary_concerns(self, concerns_list):
-        """Set primary concerns from list"""
-        self.primary_concerns = json.dumps(concerns_list)
     
     def get_notification_preferences(self):
         """Get notification preferences as dict"""
@@ -102,37 +79,354 @@ class User(db.Model):
         """Update last login timestamp"""
         self.last_login = datetime.now()
     
-    def calculate_method_success_rate(self):
-        """Calculate method success rate"""
-        if self.methods_tried_count == 0:
-            return 0.0
-        return self.effective_methods_count / self.methods_tried_count
-    
-    def is_due_for_check_in(self):
-        """Check if user is due for a method check-in"""
-        if not self.method_check_due:
-            return False
-        return datetime.now() >= self.method_check_due
-    
-    def get_crisis_risk_level(self):
-        """Get current crisis risk level based on recent activity"""
-        recent_cutoff = datetime.now() - timedelta(days=7)
-        recent_crises = CrisisEvent.query.filter(
-            CrisisEvent.user_id == self.id,
-            CrisisEvent.crisis_detected_date >= recent_cutoff
-        ).count()
-        
-        if recent_crises > 2:
-            return 'high'
-        elif recent_crises > 0:
-            return 'medium'
-        return 'low'
+    def get_full_address(self):
+        """Get formatted full address"""
+        address_parts = [self.village, self.district, self.state, self.pincode]
+        return ', '.join(filter(None, address_parts))
     
     def __repr__(self):
-        return f'<User {self.student_id}>'
+        return f'<User {self.patient_id}>'
+
+class Doctor(db.Model):
+    """Doctor model for healthcare providers"""
+    __tablename__ = 'doctors'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    doctor_id = db.Column(db.String(15), unique=True, nullable=False, index=True)
+    full_name = db.Column(db.String(100), nullable=False)
+    specialization = db.Column(db.String(100), nullable=False)
+    qualification = db.Column(db.String(200), nullable=True)
+    experience_years = db.Column(db.Integer, default=0)
+    
+    # Contact information
+    phone_number = db.Column(db.String(15), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    
+    # Practice information
+    clinic_name = db.Column(db.String(200), nullable=True)
+    clinic_address = db.Column(db.Text, nullable=True)
+    consultation_fee = db.Column(db.Float, default=0.0)
+    
+    # Availability (JSON format)
+    availability_schedule = db.Column(db.Text)  # JSON object with weekly schedule
+    
+    # Status and ratings
+    is_active = db.Column(db.Boolean, default=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    average_rating = db.Column(db.Float, default=0.0)
+    total_ratings = db.Column(db.Integer, default=0)
+    
+    # Languages spoken
+    languages_spoken = db.Column(db.Text)  # JSON array
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    appointments = db.relationship('Appointment', backref='doctor', lazy=True)
+    
+    def get_availability_schedule(self):
+        """Get availability schedule as dict"""
+        if self.availability_schedule:
+            try:
+                return json.loads(self.availability_schedule)
+            except json.JSONDecodeError:
+                return {}
+        return {}
+    
+    def set_availability_schedule(self, schedule_dict):
+        """Set availability schedule from dict"""
+        self.availability_schedule = json.dumps(schedule_dict)
+    
+    def get_languages_spoken(self):
+        """Get languages spoken as list"""
+        if self.languages_spoken:
+            try:
+                return json.loads(self.languages_spoken)
+            except json.JSONDecodeError:
+                return []
+        return []
+    
+    def set_languages_spoken(self, languages_list):
+        """Set languages spoken from list"""
+        self.languages_spoken = json.dumps(languages_list)
+    
+    def is_available_at(self, datetime_obj):
+        """Check if doctor is available at given datetime"""
+        schedule = self.get_availability_schedule()
+        day_name = datetime_obj.strftime('%A').lower()
+        
+        if day_name not in schedule:
+            return False
+        
+        day_schedule = schedule[day_name]
+        if not day_schedule.get('available', False):
+            return False
+        
+        time_str = datetime_obj.strftime('%H:%M')
+        start_time = day_schedule.get('start_time', '09:00')
+        end_time = day_schedule.get('end_time', '17:00')
+        
+        return start_time <= time_str <= end_time
+    
+    def __repr__(self):
+        return f'<Doctor {self.full_name} - {self.specialization}>'
+
+class Appointment(db.Model):
+    """Appointment model for patient-doctor bookings"""
+    __tablename__ = 'appointments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    appointment_id = db.Column(db.String(36), default=lambda: str(uuid.uuid4()), unique=True)
+    
+    # Foreign keys
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    doctor_id = db.Column(db.Integer, db.ForeignKey('doctors.id'), nullable=False, index=True)
+    
+    # Appointment details
+    appointment_datetime = db.Column(db.DateTime, nullable=False, index=True)
+    duration_minutes = db.Column(db.Integer, default=30)
+    appointment_type = db.Column(db.String(50), default='consultation')  # consultation, follow_up, emergency
+    
+    # Status tracking
+    status = db.Column(db.String(50), default='scheduled', index=True)  # scheduled, confirmed, completed, cancelled, no_show
+    booking_source = db.Column(db.String(50), default='app')  # app, phone, walk_in
+    
+    # Patient information
+    chief_complaint = db.Column(db.Text, nullable=True)  # Main reason for visit
+    symptoms = db.Column(db.Text, nullable=True)  # JSON array of symptoms
+    
+    # Consultation details
+    consultation_notes = db.Column(db.Text, nullable=True)
+    prescription = db.Column(db.Text, nullable=True)  # JSON object
+    follow_up_required = db.Column(db.Boolean, default=False)
+    follow_up_date = db.Column(db.DateTime, nullable=True)
+    
+    # Payment information
+    consultation_fee = db.Column(db.Float, default=0.0)
+    payment_status = db.Column(db.String(50), default='pending')  # pending, paid, failed
+    payment_method = db.Column(db.String(50), nullable=True)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    cancelled_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    
+    # Cancellation details
+    cancellation_reason = db.Column(db.String(200), nullable=True)
+    cancelled_by = db.Column(db.String(50), nullable=True)  # patient, doctor, system
+    
+    def get_symptoms(self):
+        """Get symptoms as list"""
+        if self.symptoms:
+            try:
+                return json.loads(self.symptoms)
+            except json.JSONDecodeError:
+                return []
+        return []
+    
+    def set_symptoms(self, symptoms_list):
+        """Set symptoms from list"""
+        self.symptoms = json.dumps(symptoms_list)
+    
+    def get_prescription(self):
+        """Get prescription as dict"""
+        if self.prescription:
+            try:
+                return json.loads(self.prescription)
+            except json.JSONDecodeError:
+                return {}
+        return {}
+    
+    def set_prescription(self, prescription_dict):
+        """Set prescription from dict"""
+        self.prescription = json.dumps(prescription_dict)
+    
+    def can_be_cancelled(self):
+        """Check if appointment can be cancelled"""
+        if self.status in ['completed', 'cancelled']:
+            return False
+        
+        # Can't cancel if appointment is within 2 hours
+        time_until_appointment = self.appointment_datetime - datetime.now()
+        return time_until_appointment.total_seconds() > 7200  # 2 hours
+    
+    def cancel_appointment(self, reason, cancelled_by='patient'):
+        """Cancel the appointment"""
+        if self.can_be_cancelled():
+            self.status = 'cancelled'
+            self.cancellation_reason = reason
+            self.cancelled_by = cancelled_by
+            self.cancelled_at = datetime.now()
+            return True
+        return False
+    
+    def complete_appointment(self, notes=None, prescription=None):
+        """Mark appointment as completed"""
+        self.status = 'completed'
+        self.completed_at = datetime.now()
+        if notes:
+            self.consultation_notes = notes
+        if prescription:
+            self.set_prescription(prescription)
+    
+    def __repr__(self):
+        return f'<Appointment {self.appointment_id}: {self.status}>'
+
+class HealthRecord(db.Model):
+    """Health record model for storing patient medical documents"""
+    __tablename__ = 'health_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    record_id = db.Column(db.String(36), default=lambda: str(uuid.uuid4()), unique=True)
+    
+    # Foreign key
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    
+    # Record details
+    record_type = db.Column(db.String(50), nullable=False, index=True)  # lab_report, prescription, x_ray, etc.
+    title = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    
+    # File information
+    file_url = db.Column(db.String(500), nullable=True)
+    file_name = db.Column(db.String(200), nullable=True)
+    file_size = db.Column(db.Integer, nullable=True)  # in bytes
+    file_type = db.Column(db.String(50), nullable=True)  # pdf, jpg, png, etc.
+    
+    # Medical information
+    test_date = db.Column(db.DateTime, nullable=True)
+    doctor_name = db.Column(db.String(100), nullable=True)
+    hospital_name = db.Column(db.String(200), nullable=True)
+    
+    # Record metadata
+    is_critical = db.Column(db.Boolean, default=False)
+    is_shared = db.Column(db.Boolean, default=False)
+    tags = db.Column(db.Text, nullable=True)  # JSON array of tags
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    def get_tags(self):
+        """Get tags as list"""
+        if self.tags:
+            try:
+                return json.loads(self.tags)
+            except json.JSONDecodeError:
+                return []
+        return []
+    
+    def set_tags(self, tags_list):
+        """Set tags from list"""
+        self.tags = json.dumps(tags_list)
+    
+    def get_file_size_formatted(self):
+        """Get formatted file size"""
+        if not self.file_size:
+            return "Unknown"
+        
+        if self.file_size < 1024:
+            return f"{self.file_size} B"
+        elif self.file_size < 1024 * 1024:
+            return f"{self.file_size / 1024:.1f} KB"
+        else:
+            return f"{self.file_size / (1024 * 1024):.1f} MB"
+    
+    def __repr__(self):
+        return f'<HealthRecord {self.title}: {self.record_type}>'
+
+class Pharmacy(db.Model):
+    """Pharmacy model for medicine shops and availability"""
+    __tablename__ = 'pharmacies'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    pharmacy_id = db.Column(db.String(15), unique=True, nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    
+    # Contact information
+    phone_number = db.Column(db.String(15), nullable=True)
+    email = db.Column(db.String(120), nullable=True)
+    
+    # Location information
+    address = db.Column(db.Text, nullable=False)
+    village = db.Column(db.String(100), nullable=True)
+    district = db.Column(db.String(100), nullable=True)
+    state = db.Column(db.String(100), default='Punjab')
+    pincode = db.Column(db.String(10), nullable=True)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    
+    # Business information
+    license_number = db.Column(db.String(50), nullable=True)
+    owner_name = db.Column(db.String(100), nullable=True)
+    
+    # Operating hours (JSON format)
+    operating_hours = db.Column(db.Text)  # JSON object with weekly schedule
+    
+    # Services offered
+    home_delivery = db.Column(db.Boolean, default=False)
+    online_payment = db.Column(db.Boolean, default=False)
+    emergency_service = db.Column(db.Boolean, default=False)
+    
+    # Status and ratings
+    is_active = db.Column(db.Boolean, default=True)
+    is_verified = db.Column(db.Boolean, default=False)
+    average_rating = db.Column(db.Float, default=0.0)
+    total_ratings = db.Column(db.Integer, default=0)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    def get_operating_hours(self):
+        """Get operating hours as dict"""
+        if self.operating_hours:
+            try:
+                return json.loads(self.operating_hours)
+            except json.JSONDecodeError:
+                return {}
+        return {}
+    
+    def set_operating_hours(self, hours_dict):
+        """Set operating hours from dict"""
+        self.operating_hours = json.dumps(hours_dict)
+    
+    def is_open_at(self, datetime_obj):
+        """Check if pharmacy is open at given datetime"""
+        hours = self.get_operating_hours()
+        day_name = datetime_obj.strftime('%A').lower()
+        
+        if day_name not in hours:
+            return False
+        
+        day_hours = hours[day_name]
+        if not day_hours.get('open', False):
+            return False
+        
+        time_str = datetime_obj.strftime('%H:%M')
+        open_time = day_hours.get('open_time', '09:00')
+        close_time = day_hours.get('close_time', '21:00')
+        
+        return open_time <= time_str <= close_time
+    
+    def get_distance_from(self, lat, lng):
+        """Calculate distance from given coordinates (simple approximation)"""
+        if not self.latitude or not self.longitude:
+            return None
+        
+        # Simple distance calculation (not accurate for long distances)
+        lat_diff = abs(self.latitude - lat)
+        lng_diff = abs(self.longitude - lng)
+        return ((lat_diff ** 2) + (lng_diff ** 2)) ** 0.5
+    
+    def __repr__(self):
+        return f'<Pharmacy {self.name}>'
 
 class ConversationTurn(db.Model):
-    """Enhanced conversation turn with detailed analysis and tracking"""
+    """Simplified conversation turn for chat history"""
     __tablename__ = 'conversation_turns'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -144,38 +438,25 @@ class ConversationTurn(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.now, index=True)
     
     # NLU Analysis results
-    detected_intent = db.Column(db.String(50), index=True)  # primary intent detected
+    detected_intent = db.Column(db.String(50), index=True)
     intent_confidence = db.Column(db.Float, default=0.0)
-    severity_score = db.Column(db.Float, default=0.0)
-    emotional_state = db.Column(db.String(50))  # primary emotion detected
-    emotional_intensity = db.Column(db.Float, default=0.0)
+    language_detected = db.Column(db.String(10), default='hi')
     
-    # Crisis detection results
-    is_crisis = db.Column(db.Boolean, default=False, index=True)
-    crisis_level = db.Column(db.Float, default=0.0)
-    crisis_risk_level = db.Column(db.String(20), default='low')  # low, medium, high, crisis
-    
-    # Response characteristics
-    conversation_stage = db.Column(db.String(50))  # stage of conversation
-    response_type = db.Column(db.String(50))  # type of response given
-    provides_concrete_help = db.Column(db.Boolean, default=False)
-    method_suggested = db.Column(db.String(100))  # method suggested in this turn
-    is_follow_up = db.Column(db.Boolean, default=False)
+    # App action taken
+    action_triggered = db.Column(db.String(100), nullable=True)
+    action_parameters = db.Column(db.Text, nullable=True)  # JSON
     
     # Context and tracking
     urgency_level = db.Column(db.String(20), default='low')
     context_entities = db.Column(db.Text)  # JSON of extracted entities
-    user_needs_identified = db.Column(db.Text)  # JSON of identified user needs
     
     # Performance metrics
-    response_time_ms = db.Column(db.Integer)  # response generation time
+    response_time_ms = db.Column(db.Integer)
     user_satisfaction_rating = db.Column(db.Integer)  # 1-5 if provided by user
     
     # Enhanced fields
     turn_id = db.Column(db.String(36), default=lambda: str(uuid.uuid4()), unique=True)
-    language_detected = db.Column(db.String(10), default='en')
-    sentiment_score = db.Column(db.Float, default=0.0)  # -1 to 1
-    topic_tags = db.Column(db.Text)  # JSON array of topic tags
+    session_id = db.Column(db.String(36), nullable=True)
     
     def get_context_entities(self):
         """Get context entities as dict"""
@@ -190,435 +471,24 @@ class ConversationTurn(db.Model):
         """Set context entities from dict"""
         self.context_entities = json.dumps(entities_dict)
     
-    def get_user_needs(self):
-        """Get user needs as list"""
-        if self.user_needs_identified:
+    def get_action_parameters(self):
+        """Get action parameters as dict"""
+        if self.action_parameters:
             try:
-                return json.loads(self.user_needs_identified)
+                return json.loads(self.action_parameters)
             except json.JSONDecodeError:
-                return []
-        return []
+                return {}
+        return {}
     
-    def set_user_needs(self, needs_list):
-        """Set user needs from list"""
-        self.user_needs_identified = json.dumps(needs_list)
-    
-    def get_topic_tags(self):
-        """Get topic tags as list"""
-        if self.topic_tags:
-            try:
-                return json.loads(self.topic_tags)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_topic_tags(self, tags_list):
-        """Set topic tags from list"""
-        self.topic_tags = json.dumps(tags_list)
-    
-    def get_conversation_summary(self):
-        """Get a brief summary of the conversation turn"""
-        user_preview = self.user_message[:100] + "..." if len(self.user_message) > 100 else self.user_message
-        return {
-            'timestamp': self.timestamp.isoformat(),
-            'user_message_preview': user_preview,
-            'detected_intent': self.detected_intent,
-            'severity_score': self.severity_score,
-            'response_provided': bool(self.bot_response)
-        }
+    def set_action_parameters(self, params_dict):
+        """Set action parameters from dict"""
+        self.action_parameters = json.dumps(params_dict)
     
     def __repr__(self):
         return f'<ConversationTurn {self.id}: {self.detected_intent}>'
 
-class MethodFeedback(db.Model):
-    """Track user feedback on therapeutic methods and techniques"""
-    __tablename__ = 'method_feedback'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
-    
-    # Method information
-    method_id = db.Column(db.String(100), nullable=False, index=True)
-    method_name = db.Column(db.String(200), nullable=False)
-    method_category = db.Column(db.String(50))  # anxiety_management, depression_support, etc.
-    
-    # Suggestion and usage tracking
-    first_suggested_date = db.Column(db.DateTime, default=datetime.now)
-    last_used_date = db.Column(db.DateTime)
-    times_suggested = db.Column(db.Integer, default=1)
-    times_used = db.Column(db.Integer, default=0)
-    
-    # Effectiveness tracking
-    effectiveness_rating = db.Column(db.String(20), default='unknown')  # effective, ineffective, partially_effective, unknown
-    effectiveness_score = db.Column(db.Float, default=0.5)  # 0.0 to 1.0
-    user_feedback_text = db.Column(db.Text)
-    feedback_date = db.Column(db.DateTime)
-    
-    # Usage context
-    severity_when_suggested = db.Column(db.Float, default=0.5)
-    intent_when_suggested = db.Column(db.String(50))
-    
-    # Outcome tracking
-    improvement_noted = db.Column(db.Boolean, default=False)
-    side_effects_reported = db.Column(db.Boolean, default=False)
-    would_recommend = db.Column(db.Boolean)
-    
-    # Enhanced tracking
-    usage_frequency = db.Column(db.String(20), default='unknown')  # daily, weekly, monthly, rarely
-    difficulty_level = db.Column(db.Integer, default=3)  # 1-5 scale
-    time_to_effect = db.Column(db.Integer)  # minutes until user felt effect
-    
-    def mark_as_used(self):
-        """Mark method as used and update timestamp"""
-        self.times_used += 1
-        self.last_used_date = datetime.now()
-    
-    def update_effectiveness(self, rating, score, feedback_text=None):
-        """Update effectiveness based on user feedback"""
-        self.effectiveness_rating = rating
-        self.effectiveness_score = score
-        if feedback_text:
-            self.user_feedback_text = feedback_text
-        self.feedback_date = datetime.now()
-        
-        # Set improvement flag based on rating
-        self.improvement_noted = rating in ['effective', 'partially_effective']
-    
-    def get_usage_pattern(self):
-        """Analyze usage pattern"""
-        if not self.last_used_date or not self.first_suggested_date:
-            return 'no_usage'
-        
-        days_since_suggestion = (datetime.now() - self.first_suggested_date).days
-        if days_since_suggestion == 0:
-            days_since_suggestion = 1
-        
-        usage_rate = self.times_used / days_since_suggestion
-        
-        if usage_rate >= 1:
-            return 'daily'
-        elif usage_rate >= 0.5:
-            return 'frequent'
-        elif usage_rate >= 0.1:
-            return 'occasional'
-        else:
-            return 'rare'
-    
-    def __repr__(self):
-        return f'<MethodFeedback {self.method_id}: {self.effectiveness_rating}>'
-
-class CounselorInteraction(db.Model):
-    """Track counselor referrals and professional help interactions"""
-    __tablename__ = 'counselor_interactions'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
-    
-    # Counselor information
-    counselor_id = db.Column(db.String(50))
-    counselor_name = db.Column(db.String(100))
-    counselor_specialties = db.Column(db.Text)  # JSON array
-    counselor_contact_info = db.Column(db.Text)  # JSON object
-    
-    # Referral tracking
-    referral_date = db.Column(db.DateTime, default=datetime.now)
-    referral_reason = db.Column(db.Text)  # Why was referral made
-    referral_urgency = db.Column(db.String(20), default='standard')  # standard, urgent, emergency
-    user_concerns_matched = db.Column(db.Text)  # JSON array of matched concerns
-    
-    # Status tracking
-    referral_status = db.Column(db.String(50), default='suggested')  # suggested, contacted, booked, attended, completed, declined
-    status_updated_date = db.Column(db.DateTime, default=datetime.now)
-    
-    # Appointment details
-    appointment_date = db.Column(db.DateTime)
-    appointment_type = db.Column(db.String(50))  # in_person, video_call, phone_call
-    booking_reference = db.Column(db.String(100))
-    
-    # Outcome tracking
-    appointment_attended = db.Column(db.Boolean)
-    user_satisfaction = db.Column(db.Integer)  # 1-5 rating
-    follow_up_recommended = db.Column(db.Boolean)
-    outcome_notes = db.Column(db.Text)
-    
-    # Enhanced tracking
-    referral_source = db.Column(db.String(50), default='chatbot')  # chatbot, user_request, crisis
-    counselor_response_time = db.Column(db.Integer)  # hours to respond
-    cost_information = db.Column(db.Text)  # JSON object with cost details
-    
-    def get_specialties(self):
-        """Get counselor specialties as list"""
-        if self.counselor_specialties:
-            try:
-                return json.loads(self.counselor_specialties)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_specialties(self, specialties_list):
-        """Set counselor specialties from list"""
-        self.counselor_specialties = json.dumps(specialties_list)
-    
-    def get_matched_concerns(self):
-        """Get matched concerns as list"""
-        if self.user_concerns_matched:
-            try:
-                return json.loads(self.user_concerns_matched)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_matched_concerns(self, concerns_list):
-        """Set matched concerns from list"""
-        self.user_concerns_matched = json.dumps(concerns_list)
-    
-    def get_contact_info(self):
-        """Get contact info as dict"""
-        if self.counselor_contact_info:
-            try:
-                return json.loads(self.counselor_contact_info)
-            except json.JSONDecodeError:
-                return {}
-        return {}
-    
-    def set_contact_info(self, contact_dict):
-        """Set contact info from dict"""
-        self.counselor_contact_info = json.dumps(contact_dict)
-    
-    def get_cost_info(self):
-        """Get cost information as dict"""
-        if self.cost_information:
-            try:
-                return json.loads(self.cost_information)
-            except json.JSONDecodeError:
-                return {}
-        return {}
-    
-    def set_cost_info(self, cost_dict):
-        """Set cost information from dict"""
-        self.cost_information = json.dumps(cost_dict)
-    
-    def update_status(self, new_status):
-        """Update referral status with timestamp"""
-        self.referral_status = new_status
-        self.status_updated_date = datetime.now()
-    
-    def days_since_referral(self):
-        """Calculate days since referral was made"""
-        return (datetime.now() - self.referral_date).days
-    
-    def is_overdue(self):
-        """Check if referral follow-up is overdue"""
-        if self.referral_status in ['completed', 'declined']:
-            return False
-        
-        days_since = self.days_since_referral()
-        
-        if self.referral_urgency == 'emergency':
-            return days_since > 1
-        elif self.referral_urgency == 'urgent':
-            return days_since > 3
-        else:
-            return days_since > 7
-    
-    def __repr__(self):
-        return f'<CounselorInteraction {self.counselor_name}: {self.referral_status}>'
-
-class CrisisEvent(db.Model):
-    """Track crisis situations and interventions"""
-    __tablename__ = 'crisis_events'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
-    
-    # Crisis details
-    crisis_detected_date = db.Column(db.DateTime, default=datetime.now, index=True)
-    crisis_level = db.Column(db.Float, nullable=False)  # 0.0 to 1.0
-    risk_assessment = db.Column(db.String(20), nullable=False)  # low, medium, high, critical
-    
-    # Crisis content
-    user_message = db.Column(db.Text, nullable=False)
-    detected_indicators = db.Column(db.Text)  # JSON array of crisis indicators found
-    crisis_type = db.Column(db.String(50))  # suicide, self_harm, severe_depression
-    
-    # Intervention provided
-    intervention_type = db.Column(db.String(50), nullable=False)  # crisis_response, emergency_referral, safety_planning
-    bot_response = db.Column(db.Text, nullable=False)
-    resources_provided = db.Column(db.Text)  # JSON array of resources/hotlines provided
-    
-    # Follow-up tracking
-    follow_up_needed = db.Column(db.Boolean, default=True)
-    follow_up_date = db.Column(db.DateTime)
-    follow_up_completed = db.Column(db.Boolean, default=False)
-    crisis_resolved = db.Column(db.Boolean, default=False)
-    
-    # Professional intervention
-    emergency_services_contacted = db.Column(db.Boolean, default=False)
-    professional_help_sought = db.Column(db.Boolean, default=False)
-    hospitalization_required = db.Column(db.Boolean, default=False)
-    
-    # Outcome tracking
-    user_safe_confirmed = db.Column(db.Boolean)
-    crisis_duration_hours = db.Column(db.Float)
-    intervention_effectiveness = db.Column(db.String(20))  # effective, partially_effective, ineffective
-    
-    # Enhanced tracking
-    crisis_id = db.Column(db.String(36), default=lambda: str(uuid.uuid4()), unique=True)
-    context_before_crisis = db.Column(db.Text)  # JSON of conversation context
-    immediate_triggers = db.Column(db.Text)  # JSON array of identified triggers
-    support_network_contacted = db.Column(db.Boolean, default=False)
-    
-    def get_detected_indicators(self):
-        """Get detected crisis indicators as list"""
-        if self.detected_indicators:
-            try:
-                return json.loads(self.detected_indicators)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_detected_indicators(self, indicators_list):
-        """Set detected indicators from list"""
-        self.detected_indicators = json.dumps(indicators_list)
-    
-    def get_resources_provided(self):
-        """Get provided resources as list"""
-        if self.resources_provided:
-            try:
-                return json.loads(self.resources_provided)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_resources_provided(self, resources_list):
-        """Set provided resources from list"""
-        self.resources_provided = json.dumps(resources_list)
-    
-    def get_context_before_crisis(self):
-        """Get crisis context as dict"""
-        if self.context_before_crisis:
-            try:
-                return json.loads(self.context_before_crisis)
-            except json.JSONDecodeError:
-                return {}
-        return {}
-    
-    def set_context_before_crisis(self, context_dict):
-        """Set crisis context from dict"""
-        self.context_before_crisis = json.dumps(context_dict)
-    
-    def get_immediate_triggers(self):
-        """Get immediate triggers as list"""
-        if self.immediate_triggers:
-            try:
-                return json.loads(self.immediate_triggers)
-            except json.JSONDecodeError:
-                return []
-        return []
-    
-    def set_immediate_triggers(self, triggers_list):
-        """Set immediate triggers from list"""
-        self.immediate_triggers = json.dumps(triggers_list)
-    
-    def mark_resolved(self):
-        """Mark crisis as resolved"""
-        self.crisis_resolved = True
-        self.follow_up_completed = True
-        if self.crisis_detected_date:
-            duration = datetime.now() - self.crisis_detected_date
-            self.crisis_duration_hours = duration.total_seconds() / 3600
-    
-    def is_recent(self, hours=24):
-        """Check if crisis occurred within specified hours"""
-        cutoff = datetime.now() - timedelta(hours=hours)
-        return self.crisis_detected_date >= cutoff
-    
-    def requires_immediate_follow_up(self):
-        """Check if crisis requires immediate follow-up"""
-        if self.crisis_resolved:
-            return False
-        
-        if self.risk_assessment in ['critical', 'high']:
-            hours_since = (datetime.now() - self.crisis_detected_date).total_seconds() / 3600
-            return hours_since >= 2  # Follow up after 2 hours for high-risk cases
-        
-        return False
-    
-    def __repr__(self):
-        return f'<CrisisEvent {self.crisis_id}: {self.risk_assessment}>'
-
-class SystemMetrics(db.Model):
-    """Track system-wide performance and effectiveness metrics"""
-    __tablename__ = 'system_metrics'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    
-    # Time period
-    metrics_date = db.Column(db.Date, default=datetime.now().date, index=True)
-    period_type = db.Column(db.String(20), default='daily')  # daily, weekly, monthly
-    
-    # Usage metrics
-    total_active_users = db.Column(db.Integer, default=0)
-    new_users_registered = db.Column(db.Integer, default=0)
-    total_conversations = db.Column(db.Integer, default=0)
-    average_conversations_per_user = db.Column(db.Float, default=0.0)
-    
-    # Response quality metrics
-    average_intent_confidence = db.Column(db.Float, default=0.0)
-    average_response_time_ms = db.Column(db.Float, default=0.0)
-    user_satisfaction_average = db.Column(db.Float, default=0.0)
-    
-    # Crisis intervention metrics
-    crisis_events_detected = db.Column(db.Integer, default=0)
-    false_positive_crisis_rate = db.Column(db.Float, default=0.0)
-    crisis_interventions_successful = db.Column(db.Integer, default=0)
-    emergency_referrals_made = db.Column(db.Integer, default=0)
-    
-    # Method effectiveness metrics
-    methods_suggested_total = db.Column(db.Integer, default=0)
-    methods_marked_effective = db.Column(db.Integer, default=0)
-    overall_method_success_rate = db.Column(db.Float, default=0.0)
-    
-    # Professional help metrics
-    counselor_referrals_made = db.Column(db.Integer, default=0)
-    referrals_resulting_in_booking = db.Column(db.Integer, default=0)
-    referral_conversion_rate = db.Column(db.Float, default=0.0)
-    
-    # User progression metrics
-    users_showing_improvement = db.Column(db.Integer, default=0)
-    users_with_declining_trend = db.Column(db.Integer, default=0)
-    average_user_improvement_score = db.Column(db.Float, default=0.0)
-    
-    # Enhanced metrics
-    system_uptime_hours = db.Column(db.Float, default=24.0)
-    error_rate_percentage = db.Column(db.Float, default=0.0)
-    peak_concurrent_users = db.Column(db.Integer, default=0)
-    
-    def calculate_conversion_rate(self):
-        """Calculate referral conversion rate"""
-        if self.counselor_referrals_made == 0:
-            return 0.0
-        return self.referrals_resulting_in_booking / self.counselor_referrals_made
-    
-    def calculate_method_success_rate(self):
-        """Calculate overall method success rate"""
-        if self.methods_suggested_total == 0:
-            return 0.0
-        return self.methods_marked_effective / self.methods_suggested_total
-    
-    def update_averages(self):
-        """Update calculated averages"""
-        self.referral_conversion_rate = self.calculate_conversion_rate()
-        self.overall_method_success_rate = self.calculate_method_success_rate()
-        
-        if self.total_active_users > 0:
-            self.average_conversations_per_user = self.total_conversations / self.total_active_users
-    
-    def __repr__(self):
-        return f'<SystemMetrics {self.metrics_date}>'
-
 class UserSession(db.Model):
-    """Track user sessions for analytics and security"""
+    """Track user sessions for analytics"""
     __tablename__ = 'user_sessions'
     
     id = db.Column(db.Integer, primary_key=True)
@@ -630,18 +500,19 @@ class UserSession(db.Model):
     session_duration_minutes = db.Column(db.Float)
     
     # Session details
-    ip_address = db.Column(db.String(45))  # IPv6 compatible
+    ip_address = db.Column(db.String(45))
     user_agent = db.Column(db.Text)
-    device_type = db.Column(db.String(50))  # mobile, desktop, tablet
+    device_type = db.Column(db.String(50))  # mobile, tablet, desktop
+    app_version = db.Column(db.String(20))
     
-    # Conversation metrics for this session
+    # Activity metrics for this session
     conversations_in_session = db.Column(db.Integer, default=0)
-    methods_suggested_in_session = db.Column(db.Integer, default=0)
-    crisis_events_in_session = db.Column(db.Integer, default=0)
+    actions_triggered_in_session = db.Column(db.Integer, default=0)
+    appointments_booked_in_session = db.Column(db.Integer, default=0)
     
     # Enhanced session tracking
     session_id = db.Column(db.String(36), default=lambda: str(uuid.uuid4()), unique=True)
-    login_method = db.Column(db.String(20), default='password')  # password, oauth, etc.
+    login_method = db.Column(db.String(20), default='password')
     last_activity = db.Column(db.DateTime, default=datetime.now)
     is_active = db.Column(db.Boolean, default=True)
     
@@ -666,21 +537,9 @@ class UserSession(db.Model):
         expiry_time = self.last_activity + timedelta(hours=hours)
         return datetime.now() > expiry_time
     
-    def get_session_summary(self):
-        """Get session summary"""
-        return {
-            'session_id': self.session_id,
-            'duration_minutes': self.session_duration_minutes,
-            'conversations': self.conversations_in_session,
-            'methods_suggested': self.methods_suggested_in_session,
-            'crisis_events': self.crisis_events_in_session,
-            'device_type': self.device_type
-        }
-    
     def __repr__(self):
         return f'<UserSession {self.session_id}>'
 
-# Additional utility models
 class SystemConfiguration(db.Model):
     """Store system configuration settings"""
     __tablename__ = 'system_configuration'
@@ -688,7 +547,7 @@ class SystemConfiguration(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     config_key = db.Column(db.String(100), unique=True, nullable=False)
     config_value = db.Column(db.Text)
-    config_type = db.Column(db.String(20), default='string')  # string, json, boolean, integer, float
+    config_type = db.Column(db.String(20), default='string')
     description = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.now)
     updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
@@ -748,56 +607,55 @@ class SystemConfiguration(db.Model):
         db.session.commit()
         return config
 
-# Database initialization and utility functions
+# Database initialization function
 def init_database(app):
     """Initialize database with app context"""
     with app.app_context():
         db.create_all()
         
-        # Create default system configurations
+        # Create default system configurations for Sehat Sahara
         default_configs = [
-            ('crisis_hotlines', json.dumps([
-                {'name': 'Emergency Services', 'number': '112', 'description': 'Immediate emergency response'},
-                {'name': 'Crisis Text Line', 'number': 'Text HOME to 741741', 'description': '24/7 crisis support via text'},
-                {'name': 'National Suicide Prevention', 'number': '1860-266-2345', 'description': 'Suicide prevention hotline'}
-            ]), 'json', 'Emergency crisis hotlines'),
+            ('emergency_numbers', json.dumps([
+                {'name': 'Ambulance', 'number': '108', 'description': 'Emergency ambulance service'},
+                {'name': 'Police', 'number': '100', 'description': 'Police emergency'},
+                {'name': 'Fire', 'number': '101', 'description': 'Fire emergency'},
+                {'name': 'Women Helpline', 'number': '1091', 'description': 'Women in distress'}
+            ]), 'json', 'Emergency contact numbers'),
             ('max_session_duration_hours', '24', 'integer', 'Maximum session duration in hours'),
-            ('enable_crisis_detection', 'true', 'boolean', 'Enable automatic crisis detection'),
-            ('method_check_interval_days', '3', 'integer', 'Days between method effectiveness check-ins'),
-            ('system_maintenance_mode', 'false', 'boolean', 'System maintenance mode flag')
+            ('supported_languages', json.dumps(['hi', 'pa', 'en']), 'json', 'Supported languages'),
+            ('app_version', '1.0.0', 'string', 'Current app version'),
+            ('maintenance_mode', 'false', 'boolean', 'System maintenance mode flag'),
+            ('default_consultation_fee', '200', 'float', 'Default consultation fee in INR'),
+            ('appointment_cancellation_hours', '2', 'integer', 'Hours before appointment when cancellation is not allowed')
         ]
         
         for key, value, config_type, description in default_configs:
             if not SystemConfiguration.query.filter_by(config_key=key).first():
                 SystemConfiguration.set_config(key, value, config_type, description)
         
-        print("✅ Database tables created successfully")
+        print("✅ Sehat Sahara database tables created successfully")
         print("✅ Default system configurations initialized")
 
 def get_user_statistics(user_id: int) -> dict:
-    """Get comprehensive user statistics"""
+    """Get comprehensive user statistics for Sehat Sahara"""
     user = User.query.get(user_id)
     if not user:
         return {}
     
-    # Get conversation statistics
-    total_turns = ConversationTurn.query.filter_by(user_id=user_id).count()
-    crisis_events = CrisisEvent.query.filter_by(user_id=user_id).count()
-    
-    # Get method effectiveness
-    effective_methods = MethodFeedback.query.filter_by(
-        user_id=user_id,
-        effectiveness_rating='effective'
+    # Get appointment statistics
+    total_appointments = Appointment.query.filter_by(user_id=user_id).count()
+    completed_appointments = Appointment.query.filter_by(user_id=user_id, status='completed').count()
+    upcoming_appointments = Appointment.query.filter(
+        Appointment.user_id == user_id,
+        Appointment.status == 'scheduled',
+        Appointment.appointment_datetime > datetime.now()
     ).count()
     
-    total_methods = MethodFeedback.query.filter_by(user_id=user_id).count()
+    # Get health records count
+    health_records_count = HealthRecord.query.filter_by(user_id=user_id).count()
     
-    # Get recent severity trend
-    recent_turns = ConversationTurn.query.filter_by(user_id=user_id)\
-        .order_by(ConversationTurn.timestamp.desc())\
-        .limit(10).all()
-    
-    severity_trend = [turn.severity_score for turn in reversed(recent_turns)]
+    # Get conversation statistics
+    total_conversations = ConversationTurn.query.filter_by(user_id=user_id).count()
     
     # Get session statistics
     total_sessions = UserSession.query.filter_by(user_id=user_id).count()
@@ -806,29 +664,27 @@ def get_user_statistics(user_id: int) -> dict:
     
     return {
         'user_info': {
-            'student_id': user.student_id,
-            'total_conversations': total_turns,
+            'patient_id': user.patient_id,
+            'full_name': user.full_name,
+            'preferred_language': user.preferred_language,
+            'location': user.get_full_address(),
             'member_since': user.created_at,
             'last_active': user.last_login,
             'total_sessions': total_sessions,
             'avg_session_duration': round(avg_session_duration, 2)
         },
-        'mental_health': {
-            'current_risk_level': user.current_risk_level,
-            'primary_concerns': user.get_primary_concerns(),
-            'severity_trend': severity_trend,
-            'improvement_trend': user.improvement_trend,
-            'crisis_risk_level': user.get_crisis_risk_level()
+        'appointments': {
+            'total_appointments': total_appointments,
+            'completed_appointments': completed_appointments,
+            'upcoming_appointments': upcoming_appointments,
+            'completion_rate': (completed_appointments / total_appointments * 100) if total_appointments > 0 else 0
         },
-        'interventions': {
-            'crisis_events': crisis_events,
-            'methods_tried': total_methods,
-            'effective_methods': effective_methods,
-            'method_success_rate': user.calculate_method_success_rate()
+        'health_records': {
+            'total_records': health_records_count
         },
-        'professional_help': {
-            'referral_status': user.counselor_referral_status,
-            'referral_date': user.referral_date
+        'app_usage': {
+            'total_conversations': total_conversations,
+            'app_version': user.app_version
         }
     }
 
@@ -848,12 +704,13 @@ def cleanup_expired_sessions():
     return len(expired_sessions)
 
 def get_system_health():
-    """Get overall system health metrics"""
+    """Get overall system health metrics for Sehat Sahara"""
     try:
         # Basic counts
         total_users = User.query.count()
         active_users = User.query.filter_by(is_active=True).count()
-        total_conversations = ConversationTurn.query.count()
+        total_doctors = Doctor.query.filter_by(is_active=True).count()
+        total_pharmacies = Pharmacy.query.filter_by(is_active=True).count()
         
         # Recent activity (last 24 hours)
         recent_cutoff = datetime.now() - timedelta(hours=24)
@@ -861,8 +718,8 @@ def get_system_health():
             ConversationTurn.timestamp >= recent_cutoff
         ).count()
         
-        recent_crises = CrisisEvent.query.filter(
-            CrisisEvent.crisis_detected_date >= recent_cutoff
+        recent_appointments = Appointment.query.filter(
+            Appointment.created_at >= recent_cutoff
         ).count()
         
         # Active sessions
@@ -872,9 +729,10 @@ def get_system_health():
             'database_healthy': True,
             'total_users': total_users,
             'active_users': active_users,
-            'total_conversations': total_conversations,
+            'total_doctors': total_doctors,
+            'total_pharmacies': total_pharmacies,
             'recent_conversations': recent_conversations,
-            'recent_crises': recent_crises,
+            'recent_appointments': recent_appointments,
             'active_sessions': active_sessions,
             'last_checked': datetime.now().isoformat()
         }

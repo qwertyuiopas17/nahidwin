@@ -1,10 +1,7 @@
 """
-
-Progressive NLU Processor - ENHANCED FIXED VERSION
-
-Advanced Natural Language Understanding for Mental Health with Ollama integration
-and comprehensive functionality restored from the original model
-
+Sehat Sahara Health Assistant NLU Processor
+Natural Language Understanding for Health App Navigation and Task-Oriented Commands
+Supports Punjabi, Hindi, and English for rural patients
 """
 
 import os
@@ -31,10 +28,11 @@ try:
 except ImportError:
     HAS_OLLAMA = False
     ollama_llama3 = None
+
 class ProgressiveNLUProcessor:
     """
-    Advanced NLU processor with Ollama Llama 3 integration for enhanced mental health understanding.
-    Includes all methods expected by the main chatbot application.
+    NLU processor for Sehat Sahara Health Assistant with multilingual support.
+    Processes user commands for health app navigation and task completion.
     """
 
     def __init__(self, model_path: str = None, ollama_model: str = "phi"):
@@ -43,19 +41,18 @@ class ProgressiveNLUProcessor:
         self.use_ollama = False
         self._lock = threading.RLock()
         
-        # Try to connect to Ollama
+        # Try to connect to API service
         if HAS_OLLAMA and ollama_llama3:
-             try:
-# Check if the API service is available
-                 if ollama_llama3.is_available:
-                      self.use_ollama = True
-                      self.logger.info(f"✅ API connection successful. Using API model for NLU processing.")
-                 else:
-                      self.use_ollama = False
-                      self.logger.warning(f"⚠️ API service not available. Falling back to keyword-based NLU.")
-             except Exception as e:
-                  self.logger.warning(f"⚠️ Could not connect to API service. Falling back to keyword-based NLU. Error: {e}")
-                  self.use_ollama = False
+            try:
+                if ollama_llama3.is_available:
+                    self.use_ollama = True
+                    self.logger.info(f"✅ API connection successful. Using API model for NLU processing.")
+                else:
+                    self.use_ollama = False
+                    self.logger.warning(f"⚠️ API service not available. Falling back to keyword-based NLU.")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Could not connect to API service. Falling back to keyword-based NLU. Error: {e}")
+                self.use_ollama = False
 
         # Initialize semantic model for enhanced understanding (optional)
         self.sentence_model = None
@@ -69,70 +66,172 @@ class ProgressiveNLUProcessor:
             except Exception as e:
                 self.logger.warning(f"Could not load semantic model: {e}")
 
-        # Enhanced mental health intent categories
+        # Health app intent categories with multilingual keywords
         self.intent_categories = {
-            'depression_symptoms': {
-                'keywords': ['depressed', 'sad', 'empty', 'hopeless', 'worthless', 'meaningless', 'no motivation', 'tired all the time', 'hate myself', 'burden', 'no energy', 'lost interest', 'numb inside'],
-                'severity_indicators': {'mild': ['sad', 'down'], 'moderate': ['depressed', 'hopeless'], 'severe': ['hate myself', 'burden', 'better off without me']}
+            'appointment_booking': {
+                'keywords': [
+                    # English
+                    'book appointment', 'need to see doctor', 'doctor appointment', 'schedule appointment',
+                    'meet doctor', 'consultation', 'book doctor', 'see doctor', 'doctor visit',
+                    # Hindi (Latin script)
+                    'doctor se milna hai', 'appointment book karni hai', 'doctor ko dikhana hai',
+                    'doctor ke paas jana hai', 'appointment chahiye', 'doctor se baat karni hai',
+                    # Punjabi (Latin script)
+                    'doctor nu milna hai', 'appointment book karni hai', 'doctor kol jana hai',
+                    'doctor nu dikhana hai', 'doctor de kol appointment', 'vaid nu milna hai'
+                ],
+                'urgency_indicators': ['urgent', 'emergency', 'turant', 'jaldi', 'emergency hai']
             },
-            'anxiety_panic': {
-                'keywords': ['anxious', 'worried', 'panic', 'nervous', 'overwhelmed', 'racing heart', 'cant breathe', 'panic attack', 'racing thoughts', 'on edge'],
-                'severity_indicators': {'mild': ['nervous', 'worried'], 'moderate': ['anxious', 'overwhelmed'], 'severe': ['panic attack', 'cant breathe']}
+            'appointment_view': {
+                'keywords': [
+                    # English
+                    'my appointments', 'when is my appointment', 'next appointment', 'appointment time',
+                    'show appointments', 'check appointment', 'appointment details',
+                    # Hindi (Latin script)
+                    'meri appointment kab hai', 'appointment ka time', 'appointment dekhni hai',
+                    'kab hai appointment', 'appointment ki jankari',
+                    # Punjabi (Latin script)
+                    'meri appointment kado hai', 'appointment kado hai', 'appointment dekhan hai',
+                    'appointment da time', 'appointment di jankari'
+                ]
             },
-            'bullying_harassment': {
-                'keywords': ['bullied', 'bullying', 'picked on', 'harassed', 'excluded', 'mean to me', 'threatening me', 'cyber bullying'],
-                'severity_indicators': {'mild': ['teasing', 'exclusion'], 'moderate': ['bullying', 'harassment'], 'severe': ['physical violence', 'serious threats']}
+            'appointment_cancel': {
+                'keywords': [
+                    # English
+                    'cancel appointment', 'cancel my appointment', 'dont want appointment',
+                    'remove appointment', 'delete appointment',
+                    # Hindi (Latin script)
+                    'appointment cancel karni hai', 'appointment nahi chahiye', 'appointment cancel karo',
+                    'appointment hatana hai',
+                    # Punjabi (Latin script)
+                    'appointment cancel karni hai', 'appointment nahi chahidi', 'appointment cancel karo',
+                    'appointment hatana hai'
+                ]
             },
-            'academic_pressure': {
-                'keywords': ['failing', 'grades', 'homework', 'study', 'exam', 'test', 'school stress', 'academic pressure', 'too much work', 'falling behind'],
-                'severity_indicators': {'mild': ['stressed about grades', 'homework pressure'], 'moderate': ['academic pressure', 'failing classes'], 'severe': ['academic burnout', 'suicidal over grades']}
+            'health_record_request': {
+                'keywords': [
+                    # English
+                    'my reports', 'blood report', 'test results', 'medical records', 'health records',
+                    'last report', 'show my reports', 'medical history', 'prescription history',
+                    # Hindi (Latin script)
+                    'meri report', 'blood report', 'test ka result', 'medical record',
+                    'pichli report', 'dawai ki history', 'report dikhao',
+                    # Punjabi (Latin script)
+                    'meri report', 'blood report', 'test da result', 'medical record',
+                    'pichli report', 'dawai di history', 'report dikhao'
+                ]
             },
-            'family_conflicts': {
-                'keywords': ['parents fighting', 'family problems', 'arguing with parents', 'family stress', 'toxic family', 'abusive parent'],
-                'severity_indicators': {'mild': ['family disagreements'], 'moderate': ['constant fighting', 'toxic family'], 'severe': ['abusive family', 'unsafe at home']}
+            'symptom_triage': {
+                'keywords': [
+                    # English
+                    'fever', 'headache', 'pain', 'cough', 'cold', 'stomach pain', 'chest pain',
+                    'feeling sick', 'not feeling well', 'symptoms', 'body ache',
+                    # Hindi (Latin script)
+                    'bukhar hai', 'sir dard hai', 'dard hai', 'khansi hai', 'pet dard hai',
+                    'tabiyat kharab hai', 'bimari hai', 'body pain hai',
+                    # Punjabi (Latin script)
+                    'bukhar hai', 'sir dukh raha hai', 'dard hai', 'khansi hai', 'pet dukh raha hai',
+                    'tabiyat kharab hai', 'bimari hai', 'body pain hai'
+                ],
+                'urgency_indicators': ['severe pain', 'chest pain', 'breathing problem', 'emergency', 'accident']
             },
-            'social_anxiety': {
-                'keywords': ['social anxiety', 'shy', 'awkward', 'cant make friends', 'nervous around people', 'judged by others', 'avoid social events'],
-                'severity_indicators': {'mild': ['shy', 'nervous'], 'moderate': ['social anxiety', 'avoid events'], 'severe': ['complete social isolation']}
+            'find_medicine': {
+                'keywords': [
+                    # English
+                    'find medicine', 'where to buy medicine', 'pharmacy near me', 'medicine shop',
+                    'buy medicine', 'medicine available', 'find pharmacy',
+                    # Hindi (Latin script)
+                    'dawai kahan milegi', 'medicine shop', 'pharmacy', 'dawai leni hai',
+                    'medicine kahan hai', 'dawai ki dukan',
+                    # Punjabi (Latin script)
+                    'dawai kithe milegi', 'medicine shop', 'pharmacy', 'dawai leni hai',
+                    'medicine kithe hai', 'dawai di dukan'
+                ]
             },
-            'loneliness_isolation': {
-                'keywords': ['lonely', 'alone', 'no friends', 'isolated', 'no one to talk to', 'disconnected', 'breakup', 'heartbroken'],
-                'severity_indicators': {'mild': ['sometimes lonely'], 'moderate': ['very lonely', 'no close friends'], 'severe': ['complete isolation']}
+            'prescription_inquiry': {
+                'keywords': [
+                    # English
+                    'how to take medicine', 'medicine dosage', 'when to take', 'medicine instructions',
+                    'tablet kitni', 'medicine timing', 'prescription details',
+                    # Hindi (Latin script)
+                    'dawai kaise leni hai', 'kitni tablet leni hai', 'dawai ka time',
+                    'medicine kab leni hai', 'dawai ki jankari',
+                    # Punjabi (Latin script)
+                    'dawai kive leni hai', 'kinni tablet leni hai', 'dawai da time',
+                    'medicine kado leni hai', 'dawai di jankari'
+                ]
             },
-            'self_harm': {
-                'keywords': ['cut myself', 'hurt myself', 'harm myself', 'cutting', 'self injury', 'want to cut', 'deserve pain', 'punish myself'],
-                'severity_indicators': {'mild': ['feeling urges'], 'moderate': ['regular self harm'], 'severe': ['daily self harm', 'life threatening']}
+            'medicine_scan': {
+                'keywords': [
+                    # English
+                    'scan medicine', 'check medicine', 'medicine scanner', 'identify medicine',
+                    'what is this medicine', 'medicine name',
+                    # Hindi (Latin script)
+                    'medicine scan karo', 'ye kya dawai hai', 'medicine check karo',
+                    'dawai ka naam', 'medicine identify karo',
+                    # Punjabi (Latin script)
+                    'medicine scan karo', 'eh ki dawai hai', 'medicine check karo',
+                    'dawai da naam', 'medicine identify karo'
+                ]
             },
-            'crisis_situation': {
-                'keywords': ['kill myself', 'suicide', 'end my life', 'want to die', 'suicidal thoughts', 'better off dead', 'ending it all', 'have a plan'],
-                'severity_indicators': {'mild': ['passive suicidal thoughts'], 'moderate': ['active suicidal thoughts'], 'severe': ['imminent suicide risk', 'have a plan']}
+            'emergency_assistance': {
+                'keywords': [
+                    # English
+                    'emergency', 'help me', 'accident', 'urgent help', 'ambulance',
+                    'emergency call', 'immediate help', 'crisis',
+                    # Hindi (Latin script)
+                    'emergency hai', 'help karo', 'accident hua hai', 'ambulance chahiye',
+                    'turant help chahiye', 'emergency call',
+                    # Punjabi (Latin script)
+                    'emergency hai', 'help karo', 'accident ho gaya hai', 'ambulance chahida',
+                    'turant help chahidi', 'emergency call'
+                ],
+                'urgency_indicators': ['emergency', 'accident', 'ambulance', 'urgent', 'help']
             },
-            'help_seeking': {
-                'keywords': ['help me', 'what should i do', 'give me advice', 'need help', 'can you help', 'show me how', 'coping strategies', 'need guidance'],
-                'severity_indicators': {'mild': ['looking for tips'], 'moderate': ['need help', 'guidance needed'], 'severe': ['urgent help needed']}
+            'report_issue': {
+                'keywords': [
+                    # English
+                    'complaint', 'doctor was rude', 'overcharged', 'bad service', 'report problem',
+                    'feedback', 'issue with', 'problem with',
+                    # Hindi (Latin script)
+                    'complaint hai', 'doctor rude tha', 'zyada paisa liya', 'service kharab thi',
+                    'problem hai', 'shikayat hai',
+                    # Punjabi (Latin script)
+                    'complaint hai', 'doctor rude si', 'zyada paisa liya', 'service kharab si',
+                    'problem hai', 'shikayat hai'
+                ]
             },
-            'sleep_problems': {
-                'keywords': ['cant sleep', 'insomnia', 'nightmares', 'tired but cant sleep', 'exhausted', 'sleep schedule messed up'],
-                'severity_indicators': {'mild': ['occasional sleeplessness'], 'moderate': ['chronic insomnia'], 'severe': ['no sleep for days']}
-            },
-            'inappropriate_content': {
-                'keywords': ['horny', 'sexy', 'hot', 'sexual', 'sex', 'hookup', 'dating', 'romantic', 'drug dealer', 'buy drugs', 'violence', 'hurt someone', 'kill someone'],
-                'severity_indicators': {'mild': ['dating', 'romantic'], 'moderate': ['horny', 'sexual thoughts'], 'severe': ['explicit sexual content', 'violence']}
+            'general_inquiry': {
+                'keywords': [
+                    # English
+                    'how to use app', 'help', 'what can you do', 'app features',
+                    'how does this work', 'guide me', 'tutorial',
+                    # Hindi (Latin script)
+                    'app kaise use kare', 'help chahiye', 'app ki features',
+                    'kaise kaam karta hai', 'guide karo',
+                    # Punjabi (Latin script)
+                    'app kive use karna hai', 'help chahidi', 'app dian features',
+                    'kive kaam karda hai', 'guide karo'
+                ]
             },
             'out_of_scope': {
-                'keywords': ['what is 10+10', 'do you like', 'your name', 'who are you', 'weather', 'news', 'sports', 'movies', 'music', 'what can you do'],
-                'severity_indicators': {} # No severity for this
-},
-            'general_support': {
-                'keywords': ['need someone to talk', 'feeling overwhelmed', 'struggling', 'need support', 'feeling lost', 'confused', 'emotional support'],
-                'severity_indicators': {'mild': ['need to talk'], 'moderate': ['overwhelmed', 'struggling'], 'severe': ['crisis level overwhelm']}
+                'keywords': [
+                    # English
+                    'weather', 'news', 'sports', 'movies', 'music', 'jokes', 'games',
+                    'what is 10+10', 'tell me a story', 'sing a song',
+                    # Hindi (Latin script)
+                    'mausam kaisa hai', 'news kya hai', 'joke sunao', 'gaana gao',
+                    'kahani sunao', 'khel',
+                    # Punjabi (Latin script)
+                    'mausam kaida hai', 'news ki hai', 'joke sunao', 'gana gao',
+                    'kahani sunao', 'khel'
+                ]
             }
         }
 
         self.conversation_stages = [
-            'initial_contact', 'understanding', 'trust_building', 'gentle_help_offering',
-            'method_suggestion', 'method_follow_up', 'ongoing_support', 'crisis_intervention',
-            'professional_referral'
+            'initial_contact', 'understanding', 'task_execution', 'confirmation',
+            'completion', 'emergency_handling'
         ]
 
         # Build semantic embeddings if available
@@ -150,7 +249,7 @@ class ProgressiveNLUProcessor:
             for category, data in self.intent_categories.items():
                 # Use keywords to create pseudo-sentences for embedding
                 keywords = data['keywords'][:5]  # Use top 5 keywords
-                pseudo_sentences = [f"I feel {keyword}" for keyword in keywords]
+                pseudo_sentences = [f"I want to {keyword}" for keyword in keywords]
                 
                 # Create embeddings
                 embeddings = self.sentence_model.encode(pseudo_sentences)
@@ -163,33 +262,29 @@ class ProgressiveNLUProcessor:
             self.logger.error(f"Failed to build semantic embeddings: {e}")
             self.use_semantic = False
 
-    # THIS IS THE CORRECT LINE
     def understand_user_intent(self, user_message: str, conversation_history: List[Dict[str, Any]] = None, excluded_intents: List[str] = None) -> Dict[str, Any]:
         """
-        Processes a user's message to understand intent, severity, and other NLU metrics,
-        using Ollama Llama 3 if available, otherwise falling back to a robust keyword-based system.
+        Processes a user's message to understand intent and urgency for health app navigation.
         """
         cleaned_message = self._clean_and_preprocess(user_message)
         
-        # Immediate override for inappropriate content for safety and focus.
-        inappropriate_keywords = ['horny', 'sexy', 'sexual', 'sex', 'hookup']
-        if any(keyword in cleaned_message for keyword in inappropriate_keywords):
-            return self._generate_inappropriate_content_response()
+        # Immediate check for out of scope content
+        if self._is_out_of_scope(cleaned_message):
+            return self._generate_out_of_scope_response()
 
-        # Attempt to use Ollama for primary analysis.
+        # Attempt to use API service for primary analysis
         if self.use_ollama:
             ollama_result = self._get_ollama_analysis(cleaned_message, conversation_history)
             if ollama_result:
-                # If Ollama provides a valid result, use it.
                 return self._compile_final_analysis(ollama_result, cleaned_message)
 
-        # Fallback to the internal keyword-based system
-        self.logger.info(f"Falling back to keyword-based NLU for message: '{cleaned_message[:50]}...'")
+        # Fallback to keyword-based system
+        self.logger.info(f"Using keyword-based NLU for message: '{cleaned_message[:50]}...'")
         fallback_result = self._get_fallback_analysis(cleaned_message, excluded_intents)
         return self._compile_final_analysis(fallback_result, cleaned_message)
 
     def _get_ollama_analysis(self, user_message: str, conversation_history: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-        """Uses Ollama with conversation history for a contextual NLU analysis."""
+        """Uses API service with conversation history for contextual NLU analysis."""
         try:
             history_str = "No previous conversation history."
             if conversation_history:
@@ -199,211 +294,95 @@ class ProgressiveNLUProcessor:
                     content = turn.get('content', '')
                     history_context.append(f"{role}: {content}")
                 history_str = "\n".join(history_context)
-            # Construct a detailed prompt for the LLM.
+
             prompt = f"""
-You are an expert mental health NLU system. Analyze the user's LATEST message based on the provided conversation history. Return ONLY a valid JSON response...
+You are the Sehat Sahara Health Assistant NLU system. Analyze the user's LATEST message for health app navigation intent. Return ONLY a valid JSON response:
+
 {{
     "primary_intent": "one of: {', '.join(self.intent_categories.keys())}",
     "confidence": 0.85,
-    "severity_score": 0.65,
-    "emotional_state": {{
-        "primary_emotion": "sad/anxious/angry/hopeless/neutral",
-        "intensity": 0.7
-    }},
-    "urgency_level": "low/medium/high/crisis",
-    "requires_immediate_help": false,
-    "context_entities": {{ "people": [], "places": [], "triggers": [] }},
-    "user_needs": ["emotional_support", "coping_strategies"],
-    "risk_factors": ["isolation", "suicidal_ideation"],
+    "urgency_level": "low/medium/high/emergency",
+    "language_detected": "en/hi/pa",
+    "context_entities": {{ "doctor_type": "", "symptom": "", "medicine_name": "" }},
+    "user_needs": ["app_navigation", "information", "booking"],
     "in_scope": true
 }}
 
 Guidelines:
-- Use the HISTORY to understand the context of short messages (e.g., "no", "yes", "help me").
-- The primary_intent should reflect the topic of the ONGOING conversation unless the user clearly changes the subject.
-- crisis_situation: Only for explicit suicidal ideation or immediate danger.
-- severity_score: 0.0-1.0 (crisis=0.9+, severe=0.7+, moderate=0.5+, mild=0.3+).
-- Return ONLY valid JSON, no other text.
+- emergency_assistance: Only for explicit emergencies, accidents, or urgent medical help
+- urgency_level: "emergency" only for life-threatening situations
+- Use conversation HISTORY to understand context of short messages
+- Detect language: en=English, hi=Hindi, pa=Punjabi
+- Return ONLY valid JSON, no other text
+
 HISTORY:
 {history_str}
 
 Analyze this message: '{user_message}'
 """
 
-            response_text = ollama_llama3.client.generate_response(prompt, max_tokens=400, temperature=0.3)
+            response_text = ollama_llama3.client.generate_response(prompt, max_tokens=300, temperature=0.3)
             if not response_text:
                 return None
+
             json_start = response_text.find("{")
             json_end = response_text.rfind("}") + 1
             if json_start >= 0 and json_end > json_start:
-                 json_str = response_text[json_start:json_end]
-                 analysis = json.loads(json_str)
+                json_str = response_text[json_start:json_end]
+                analysis = json.loads(json_str)
+                self.logger.info(f"✅ API NLU analysis successful for: {user_message[:50]}...")
+                return analysis
             else:
                 return None
 
-            # The response content should already be a JSON string.
-           
-            self.logger.info(f"✅ Ollama NLU analysis successful for: {user_message[:50]}...")
-            return analysis
-
         except Exception as e:
-            self.logger.error(f"❌ Ollama NLU analysis failed: {e}")
+            self.logger.error(f"❌ API NLU analysis failed: {e}")
             return None
 
-    def _get_fallback_analysis(self, message: str, conversation_history: List[Dict[str, Any]] = None, excluded_intents: List[str] = None) -> Dict[str, Any]:
-        """Generates NLU analysis using keywords, with a context-aware fallback for short messages."""
+    def _get_fallback_analysis(self, message: str, excluded_intents: List[str] = None) -> Dict[str, Any]:
+        """Generates NLU analysis using keywords for health app navigation."""
         
-        # --- FIX START: Handle short, context-dependent messages ---
-        # If the message is short (e.g., "no", "ok"), infer intent from the last turn.
-        if len(message.split()) <= 2 and conversation_history:
-            last_intent = 'general_support'
-            # Find the intent from the most recent turn in history
-            for turn in reversed(conversation_history):
-                if turn.get('intent'):
-                    last_intent = turn['intent']
-                    break
-            
-            self.logger.info(f"Short message detected. Inheriting intent '{last_intent}' from conversation history.")
-            # Create a minimal analysis, inheriting the previous intent
-            analysis = self._comprehensive_intent_detection(message)
-            analysis['primary_intent'] = last_intent
-            analysis['confidence'] = 0.90 # High confidence it's a contextual follow-up
-        else:
-            # Otherwise, perform a full keyword-based analysis
-            analysis = self._comprehensive_intent_detection(message, excluded_intents)
-        emotional_analysis = self._advanced_emotional_analysis(message)
-        context_entities = self._extract_comprehensive_context(message)
+        # Handle short, context-dependent messages
+        if len(message.split()) <= 2:
+            self.logger.info(f"Short message detected: '{message}'. Using general_inquiry intent.")
+            return {
+                'primary_intent': 'general_inquiry',
+                'confidence': 0.7,
+                'urgency_level': 'low',
+                'language_detected': self._detect_language(message),
+                'context_entities': {},
+                'user_needs': ['guidance'],
+                'in_scope': True
+            }
+
+        # Perform keyword-based analysis
+        analysis = self._comprehensive_intent_detection(message, excluded_intents)
         urgency_analysis = self._assess_urgency_and_severity(message, analysis)
-        scope_validation = self._validate_mental_health_scope(message)
-        user_needs = self._identify_comprehensive_user_needs(analysis['primary_intent'], emotional_analysis, urgency_analysis)
+        context_entities = self._extract_health_context(message)
+        language_detected = self._detect_language(message)
+        user_needs = self._identify_user_needs(analysis['primary_intent'])
 
         return {
             'primary_intent': analysis['primary_intent'],
             'confidence': analysis['confidence'],
-            'severity_score': urgency_analysis['severity_score'],
-            'emotional_state': emotional_analysis,
             'urgency_level': urgency_analysis['urgency_level'],
-            'requires_immediate_help': urgency_analysis['requires_immediate_help'],
+            'language_detected': language_detected,
             'context_entities': context_entities,
             'user_needs': user_needs,
-            'risk_factors': urgency_analysis['risk_factors'],
-            'in_scope': scope_validation['in_scope']
+            'in_scope': True
         }
-    
-    # In nlu_processor.py, inside the ProgressiveNLUProcessor class
-
-    def _safe_float(self, value, default=0.0):
-        """Safely convert a value to a float, handling lists or other types."""
-        if isinstance(value, (int, float)):
-            return float(value)
-        if isinstance(value, list) and len(value) > 0:
-            # Try to convert the first element of the list
-            try:
-                return float(value[0])
-            except (ValueError, TypeError):
-                return default
-        if isinstance(value, str):
-            try:
-                return float(value)
-            except (ValueError, TypeError):
-                return default
-        return default
-
-    def _compile_final_analysis(self, analysis_data: Dict[str, Any], cleaned_message: str) -> Dict[str, Any]:
-        """Compiles the final NLU response object from the analysis data."""
-         # --- FIX START: Add a safety check for the primary_intent format ---
-        primary_intent_value = analysis_data.get('primary_intent', 'general_support')
-        if isinstance(primary_intent_value, list) and len(primary_intent_value) > 0:
-        # If it's a list, take the first element
-           primary_intent_value = primary_intent_value[0]
-        elif not isinstance(primary_intent_value, str):
-        # If it's something else, default to a string
-           primary_intent_value = 'general_support'
-    # --- FIX END ---
-        analysis = {
-            'primary_intent': primary_intent_value,
-            'confidence': analysis_data.get('confidence', 0.5),
-            'all_scores': {primary_intent_value: analysis_data.get('confidence', 0.5)},
-            'secondary_intents': analysis_data.get('secondary_intents', [])
-            }
-        # --- FIX START: Add a safety check for the emotional_state format ---
-        emotional_state_data = analysis_data.get('emotional_state', {})
-        if not isinstance(emotional_state_data, dict):
-        # If it's a string, create a default dictionary structure
-           emotional_state_data = {'primary_emotion': str(emotional_state_data), 'intensity': 0.5}
-        # --- FIX END ---
-
-
-        conversation_stage = self._determine_conversation_stage(cleaned_message, analysis)
-        response_recommendations = self._generate_response_recommendations(analysis, analysis_data.get('emotional_state', {}), analysis_data, conversation_stage)
-
-        # Sanitize and structure the final output
-        return {
-            'primary_intent': analysis['primary_intent'],
-            'confidence': float(analysis['confidence']),
-            'intent_distribution': analysis['all_scores'],
-            'secondary_intents': analysis['secondary_intents'],
-            'emotional_state': analysis_data.get('emotional_state', {'primary_emotion': 'neutral', 'intensity': 0.0}),
-            'emotional_intensity': self._safe_float(analysis_data.get('emotional_state', {}).get('intensity', 0.0)),
-            'context_entities': analysis_data.get('context_entities', {}),
-            'conversation_stage': conversation_stage,
-            'urgency_level': analysis_data.get('urgency_level', 'low'),
-            'severity_score': self._safe_float(analysis_data.get('severity_score', 0.0)),
-            'risk_factors': analysis_data.get('risk_factors', []),
-            'requires_immediate_help': bool(analysis_data.get('requires_immediate_help', False)),
-            'in_scope': bool(analysis_data.get('in_scope', True)),
-            'user_needs': analysis_data.get('user_needs', ['emotional_support']),
-            'response_recommendations': response_recommendations,
-            'processing_timestamp': datetime.now().isoformat(),
-            'ollama_analysis_used': self.use_ollama
-        }
-
-    def _generate_inappropriate_content_response(self) -> Dict[str, Any]:
-        """Returns a structured response for inappropriate content."""
-        return {
-            'primary_intent': 'inappropriate_content',
-            'confidence': 0.99,
-            'intent_distribution': {'inappropriate_content': 0.99},
-            'emotional_state': {'primary_emotion': 'neutral', 'intensity': 0.1},
-            'context_entities': {},
-            'conversation_stage': 'initial_contact',
-            'urgency_level': 'low',
-            'severity_score': 0.1,
-            'requires_immediate_help': False,
-            'risk_factors': [],
-            'in_scope': True,
-            'user_needs': ['boundary_setting'],
-            'response_recommendations': {'response_type': 'redirect'},
-            'processing_timestamp': datetime.now().isoformat(),
-            'ollama_analysis_used': False
-        }
-
-    # --- Fallback Methods (Keyword and Pattern-Based) ---
-
-    def _clean_and_preprocess(self, message: str) -> str:
-        """Cleans and standardizes the user's message for analysis."""
-        cleaned = message.lower().strip()
-        contractions = {
-            "can't": "cannot", "won't": "will not", "don't": "do not", "didn't": "did not",
-            "i'm": "i am", "you're": "you are", "it's": "it is", "i've": "i have"
-        }
-
-        for contraction, expansion in contractions.items():
-            cleaned = cleaned.replace(contraction, expansion)
-        cleaned = re.sub(r'[^\w\s]', '', cleaned)  # Remove punctuation
-        return cleaned
 
     def _comprehensive_intent_detection(self, message: str, excluded_intents: List[str] = None) -> Dict[str, Any]:
-        """Combines keyword and pattern matching for fallback intent detection."""
+        """Combines keyword matching for health app intent detection."""
         keyword_scores = self._enhanced_keyword_intent_detection(message)
         
         if excluded_intents:
             for intent in excluded_intents:
                 if intent in keyword_scores:
-                    keyword_scores[intent] *= 0.1  # Penalize excluded intents
+                    keyword_scores[intent] *= 0.1
 
         if not keyword_scores:
-            primary_intent = 'general_support'
+            primary_intent = 'general_inquiry'
             confidence = 0.3
         else:
             primary_intent = max(keyword_scores, key=keyword_scores.get)
@@ -416,124 +395,173 @@ Analyze this message: '{user_message}'
         }
 
     def _enhanced_keyword_intent_detection(self, message: str) -> Dict[str, float]:
-        """Detects intent based on keywords with severity weighting."""
+        """Detects intent based on keywords with multilingual support."""
         scores = {}
         for category, data in self.intent_categories.items():
             score = 0.0
             for keyword in data['keywords']:
-                if re.search(r'\b' + re.escape(keyword) + r'\b', message):
-                    score += 0.1 * len(keyword.split())  # Weight longer phrases more
+                if re.search(r'\b' + re.escape(keyword) + r'\b', message, re.IGNORECASE):
+                    score += 0.2 * len(keyword.split())  # Weight longer phrases more
 
-            for level, indicators in data.get('severity_indicators', {}).items():
-                multiplier = {'mild': 1.2, 'moderate': 1.5, 'severe': 2.0}.get(level, 1.0)
-                for indicator in indicators:
-                    if re.search(r'\b' + re.escape(indicator) + r'\b', message):
-                        score *= multiplier
+            # Boost score for urgency indicators
+            for urgency_indicator in data.get('urgency_indicators', []):
+                if re.search(r'\b' + re.escape(urgency_indicator) + r'\b', message, re.IGNORECASE):
+                    score *= 1.5
 
             if score > 0:
                 scores[category] = min(score, 1.0)
         return scores
 
-    def _advanced_emotional_analysis(self, message: str) -> Dict[str, Any]:
-        """Analyzes the emotional tone of the message."""
-        emotions = {
-            'sad': ['sad', 'depressed', 'down', 'hopeless', 'empty'],
-            'anxious': ['anxious', 'worried', 'nervous', 'scared', 'panic'],
-            'angry': ['angry', 'mad', 'frustrated', 'irritated'],
-            'neutral': ['okay', 'fine', 'alright']
-        }
-
-        detected_emotions = {emotion: sum(1 for keyword in keywords if keyword in message) for emotion, keywords in emotions.items()}
-        if any(detected_emotions.values()):
-            primary_emotion = max(detected_emotions, key=detected_emotions.get)
-            intensity = min(detected_emotions[primary_emotion] * 0.3, 1.0)
-        else:
-            primary_emotion = 'neutral'
-            intensity = 0.0
-
-        return {'primary_emotion': primary_emotion, 'intensity': intensity}
-
-    def _extract_comprehensive_context(self, message: str) -> Dict[str, List[str]]:
-        """Extracts basic entities like people and places."""
-        context = {'people': [], 'places': []}
-        people_keywords = ['mom', 'dad', 'parents', 'friend', 'teacher', 'boss']
-        place_keywords = ['school', 'work', 'home']
-
-        context['people'] = [p for p in people_keywords if p in message]
-        context['places'] = [p for p in place_keywords if p in message]
-        return context
-
     def _assess_urgency_and_severity(self, message: str, analysis: Dict) -> Dict[str, Any]:
-        """Assesses urgency and severity based on keywords and intent."""
+        """Assesses urgency based on keywords and intent for health app context."""
         intent = analysis['primary_intent']
-        base_severity = {
-            'crisis_situation': 1.0, 'self_harm': 0.9, 'depression_symptoms': 0.7,
-            'anxiety_panic': 0.6, 'bullying_harassment': 0.6, 'family_conflicts': 0.5,
-            'academic_pressure': 0.4, 'social_anxiety': 0.4, 'loneliness_isolation': 0.4,
-            'sleep_problems': 0.3, 'help_seeking': 0.2, 'general_support': 0.2,
-            'inappropriate_content': 0.1
-        }.get(intent, 0.2)
-
-        urgency_keywords = ['right now', 'tonight', 'today', 'immediately', 'urgent']
-        is_urgent = any(keyword in message for keyword in urgency_keywords)
-        urgency_level = 'high' if is_urgent else ('medium' if base_severity > 0.5 else 'low')
-
-        risk_factors = []
-        if 'suicide' in message or 'kill myself' in message:
-            risk_factors.append('suicidal_ideation')
-        if 'cut myself' in message or 'self harm' in message:
-            risk_factors.append('self_harm')
-
-        final_severity = base_severity + (0.2 if is_urgent else 0) + (0.1 * len(risk_factors))
-        requires_immediate_help = intent == 'crisis_situation' or final_severity >= 0.9
+        
+        # Emergency keywords
+        emergency_keywords = ['emergency', 'accident', 'ambulance', 'help me', 'urgent help', 
+                             'emergency hai', 'accident hua hai', 'turant help', 'emergency call']
+        
+        # High urgency symptoms
+        urgent_symptoms = ['chest pain', 'breathing problem', 'severe pain', 'unconscious',
+                          'chest mein dard', 'saans nahi aa rahi', 'behosh']
+        
+        urgency_level = 'low'
+        
+        if intent == 'emergency_assistance' or any(keyword in message.lower() for keyword in emergency_keywords):
+            urgency_level = 'emergency'
+        elif any(symptom in message.lower() for symptom in urgent_symptoms):
+            urgency_level = 'high'
+        elif intent == 'symptom_triage':
+            urgency_level = 'medium'
 
         return {
-            'urgency_level': urgency_level,
-            'severity_score': min(final_severity, 1.0),
-            'risk_factors': risk_factors,
-            'requires_immediate_help': requires_immediate_help
+            'urgency_level': urgency_level
+        }
+
+    def _extract_health_context(self, message: str) -> Dict[str, str]:
+        """Extracts health-related entities from the message."""
+        context = {}
+        
+        # Doctor specialties
+        specialties = ['cardiologist', 'dermatologist', 'pediatrician', 'gynecologist', 
+                      'orthopedic', 'neurologist', 'heart doctor', 'skin doctor', 'child doctor']
+        for specialty in specialties:
+            if specialty in message.lower():
+                context['doctor_type'] = specialty
+                break
+        
+        # Common symptoms
+        symptoms = ['fever', 'headache', 'cough', 'pain', 'cold', 'bukhar', 'sir dard', 'khansi']
+        for symptom in symptoms:
+            if symptom in message.lower():
+                context['symptom'] = symptom
+                break
+        
+        return context
+
+    def _detect_language(self, message: str) -> str:
+        """Simple language detection based on script and common words."""
+        # Hindi indicators
+        hindi_words = ['hai', 'kya', 'kaise', 'kab', 'kahan', 'meri', 'mera', 'chahiye', 'leni', 'dard']
+        # Punjabi indicators  
+        punjabi_words = ['hai', 'ki', 'kive', 'kado', 'kithe', 'meri', 'mera', 'chahidi', 'leni', 'dukh']
+        
+        message_lower = message.lower()
+        
+        hindi_count = sum(1 for word in hindi_words if word in message_lower)
+        punjabi_count = sum(1 for word in punjabi_words if word in message_lower)
+        
+        if hindi_count > punjabi_count and hindi_count > 0:
+            return 'hi'
+        elif punjabi_count > 0:
+            return 'pa'
+        else:
+            return 'en'
+
+    def _identify_user_needs(self, primary_intent: str) -> List[str]:
+        """Identifies user needs based on intent."""
+        need_mapping = {
+            'appointment_booking': ['booking', 'doctor_connection'],
+            'appointment_view': ['information', 'schedule_check'],
+            'appointment_cancel': ['booking_management'],
+            'health_record_request': ['information', 'record_access'],
+            'symptom_triage': ['health_assessment', 'guidance'],
+            'find_medicine': ['pharmacy_search', 'medicine_availability'],
+            'prescription_inquiry': ['information', 'medicine_guidance'],
+            'medicine_scan': ['medicine_identification'],
+            'emergency_assistance': ['immediate_help', 'emergency_services'],
+            'report_issue': ['feedback', 'complaint_handling'],
+            'general_inquiry': ['guidance', 'app_navigation'],
+            'out_of_scope': ['redirection']
+        }
+        return need_mapping.get(primary_intent, ['guidance'])
+
+    def _is_out_of_scope(self, message: str) -> bool:
+        """Check if message is out of scope for health app."""
+        out_of_scope_keywords = self.intent_categories['out_of_scope']['keywords']
+        return any(keyword in message.lower() for keyword in out_of_scope_keywords)
+
+    def _generate_out_of_scope_response(self) -> Dict[str, Any]:
+        """Returns structured response for out of scope content."""
+        return {
+            'primary_intent': 'out_of_scope',
+            'confidence': 0.95,
+            'urgency_level': 'low',
+            'language_detected': 'en',
+            'context_entities': {},
+            'user_needs': ['redirection'],
+            'in_scope': False
+        }
+
+    def _clean_and_preprocess(self, message: str) -> str:
+        """Cleans and standardizes the user's message for analysis."""
+        cleaned = message.lower().strip()
+        contractions = {
+            "can't": "cannot", "won't": "will not", "don't": "do not", "didn't": "did not",
+            "i'm": "i am", "you're": "you are", "it's": "it is", "i've": "i have"
+        }
+
+        for contraction, expansion in contractions.items():
+            cleaned = cleaned.replace(contraction, expansion)
+        cleaned = re.sub(r'[^\w\s]', '', cleaned)
+        return cleaned
+
+    def _compile_final_analysis(self, analysis_data: Dict[str, Any], cleaned_message: str) -> Dict[str, Any]:
+        """Compiles the final NLU response object from the analysis data."""
+        primary_intent_value = analysis_data.get('primary_intent', 'general_inquiry')
+        if isinstance(primary_intent_value, list) and len(primary_intent_value) > 0:
+            primary_intent_value = primary_intent_value[0]
+        elif not isinstance(primary_intent_value, str):
+            primary_intent_value = 'general_inquiry'
+
+        conversation_stage = self._determine_conversation_stage(cleaned_message, {'primary_intent': primary_intent_value})
+
+        return {
+            'primary_intent': primary_intent_value,
+            'confidence': float(analysis_data.get('confidence', 0.5)),
+            'urgency_level': analysis_data.get('urgency_level', 'low'),
+            'language_detected': analysis_data.get('language_detected', 'en'),
+            'context_entities': analysis_data.get('context_entities', {}),
+            'conversation_stage': conversation_stage,
+            'user_needs': analysis_data.get('user_needs', ['guidance']),
+            'in_scope': bool(analysis_data.get('in_scope', True)),
+            'processing_timestamp': datetime.now().isoformat(),
+            'api_analysis_used': self.use_ollama
         }
 
     def _determine_conversation_stage(self, message: str, analysis: Dict) -> str:
-        """Determines the current stage of the conversation."""
+        """Determines the current stage of the conversation for health app context."""
         intent = analysis['primary_intent']
         
-        if intent == 'crisis_situation':
-            return 'crisis_intervention'
-        if intent == 'help_seeking':
-            return 'method_suggestion'
-        if any(kw in message for kw in ['tried', 'worked', 'helped']):
-            return 'method_follow_up'
-        return 'understanding'
+        if intent == 'emergency_assistance':
+            return 'emergency_handling'
+        elif intent in ['appointment_booking', 'find_medicine', 'medicine_scan']:
+            return 'task_execution'
+        elif intent in ['appointment_view', 'health_record_request', 'prescription_inquiry']:
+            return 'information_retrieval'
+        else:
+            return 'understanding'
 
-    def _validate_mental_health_scope(self, message: str) -> Dict[str, Any]:
-        """Validates if the message is within the chatbot's scope."""
-        is_in_scope = any(intent for intent, data in self.intent_categories.items() 
-                         if any(kw in message for kw in data['keywords']))
-        return {'in_scope': is_in_scope, 'relevance_score': 1.0 if is_in_scope else 0.1}
-
-    def _identify_comprehensive_user_needs(self, primary_intent: str, emotional_analysis: Dict, urgency_analysis: Dict) -> List[str]:
-        """Identifies user needs based on the analysis."""
-        needs = {'emotional_support'}
-        
-        if primary_intent == 'help_seeking':
-            needs.add('coping_strategies')
-        if urgency_analysis['requires_immediate_help']:
-            needs.add('immediate_safety')
-        return list(needs)
-
-    def _generate_response_recommendations(self, analysis: Dict, emotional_analysis: Dict, urgency_analysis: Dict, conversation_stage: str) -> Dict[str, Any]:
-        """Generates recommendations for the response generator."""
-        if urgency_analysis.get('requires_immediate_help'):
-            return {'response_type': 'crisis_intervention', 'priority': 'immediate_safety'}
-        if conversation_stage == 'method_suggestion':
-            return {'response_type': 'skill_teaching', 'priority': 'concrete_help'}
-        return {'response_type': 'supportive', 'priority': 'emotional_support'}
-
-    # ============================================================================
-    # CRITICAL: Methods expected by the main chatbot application
-    # ============================================================================
-
+    # Backward compatibility and utility methods
     def save_nlu_model(self, filepath: str) -> bool:
         """Save NLU model configuration and learned parameters."""
         try:
@@ -546,11 +574,10 @@ Analyze this message: '{user_message}'
                     'use_ollama': self.use_ollama,
                     'ollama_model': self.ollama_model,
                     'use_semantic': self.use_semantic,
-                    'model_version': '2.1.0',
+                    'model_version': '3.0.0',
                     'save_timestamp': datetime.now().isoformat()
                 }
                 
-                # Save semantic embeddings if available
                 if hasattr(self, 'category_embeddings') and self.category_embeddings:
                     config['category_embeddings'] = {
                         category: embedding.tolist() 
@@ -574,12 +601,10 @@ Analyze this message: '{user_message}'
                 with open(filepath, 'rb') as f:
                     config = pickle.load(f)
                 
-                # Load configurations
                 self.intent_categories = config.get('intent_categories', self.intent_categories)
                 self.conversation_stages = config.get('conversation_stages', self.conversation_stages)
                 self.ollama_model = config.get('ollama_model', self.ollama_model)
                 
-                # Load semantic embeddings if available
                 if 'category_embeddings' in config and self.use_semantic:
                     self.category_embeddings = {
                         category: np.array(embedding) 
@@ -599,20 +624,20 @@ Analyze this message: '{user_message}'
     def get_model_info(self) -> Dict[str, Any]:
         """Get information about the current model configuration."""
         return {
-            'model_type': 'Progressive NLU Processor with Ollama Integration',
-            'version': '2.1.0',
-            'ollama_enabled': self.use_ollama,
-            'ollama_model': self.ollama_model if self.use_ollama else None,
+            'model_type': 'Sehat Sahara Health Assistant NLU Processor',
+            'version': '3.0.0',
+            'api_enabled': self.use_ollama,
+            'api_model': self.ollama_model if self.use_ollama else None,
             'semantic_enabled': self.use_semantic,
             'intent_categories_count': len(self.intent_categories),
             'conversation_stages_count': len(self.conversation_stages),
+            'supported_languages': ['English', 'Hindi', 'Punjabi'],
             'initialized_at': datetime.now().isoformat()
         }
 
     def validate_configuration(self) -> bool:
         """Validate the current model configuration."""
         try:
-            # Check essential components
             if not self.intent_categories:
                 self.logger.error("❌ No intent categories defined")
                 return False
@@ -621,8 +646,7 @@ Analyze this message: '{user_message}'
                 self.logger.error("❌ No conversation stages defined")
                 return False
             
-            # Test basic functionality
-            test_result = self.understand_user_intent("I feel sad")
+            test_result = self.understand_user_intent("book appointment")
             if not test_result or 'primary_intent' not in test_result:
                 self.logger.error("❌ Basic intent detection failed")
                 return False
@@ -642,9 +666,9 @@ Analyze this message: '{user_message}'
     def get_intent_confidence(self, message: str, intent: str) -> float:
         """Get confidence score for a specific intent."""
         result = self.understand_user_intent(message)
-        return result['intent_distribution'].get(intent, 0.0)
+        return result.get('confidence', 0.0) if result.get('primary_intent') == intent else 0.0
 
-    def is_crisis_detected(self, message: str) -> bool:
-        """Quick check if message indicates crisis situation."""
+    def is_emergency_detected(self, message: str) -> bool:
+        """Quick check if message indicates emergency situation."""
         result = self.understand_user_intent(message)
-        return result['requires_immediate_help'] or result['primary_intent'] == 'crisis_situation'
+        return result['urgency_level'] == 'emergency' or result['primary_intent'] == 'emergency_assistance'
